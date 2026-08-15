@@ -72,7 +72,7 @@
              }
          }
      }
-@@ -211,9 +_,20 @@
+@@ -211,10 +_,24 @@
  
      private void mergeWithNeighbours() {
          if (this.isMergable()) {
@@ -94,6 +94,10 @@
                      this.tryToMerge(entity);
                      if (this.isRemoved()) {
                          break;
+                     }
++                    if (io.papermc.paper.niceserver.NiceServerConfig.skipItemMergeWhenFull && !this.isMergable()) {
++                        break; // NiceServer - Leaf: stop once this stack is full
++                    }
 @@ -225,7 +_,7 @@
  
      private boolean isMergable() {

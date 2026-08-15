@@ -63,6 +63,12 @@ public final class NiceServerConfig {
     public static boolean cacheSpecialDates = true;
     public static boolean skipUnloadedChunksForEndermanTeleport = true;
     public static boolean skipUnloadedChunksForBlockGoals = true;
+    public static boolean reduceUselessEntityMovePackets = true;
+    public static boolean skipUnchangedEntityMotionPackets = true;
+    public static boolean checkTargetRangeBeforeVisibility = true;
+    public static int villagerItemRepickup = 100;
+    public static boolean skipUnloadedChunksForGrassSpread = true;
+    public static boolean skipItemMergeWhenFull = true;
 
     // --- gameplay ---
     public static boolean disableNaturalMobSpawning = false;
@@ -166,6 +172,18 @@ public final class NiceServerConfig {
             "Enderman random teleport does not load chunks. Airplane/Pufferfish.");
         skipUnloadedChunksForBlockGoals = getBoolean("optimizations.skip-unloaded-chunks-for-block-goals", true,
             "MoveToBlockGoal skips unloaded chunks (Paper#6045). Pufferfish.");
+        reduceUselessEntityMovePackets = getBoolean("optimizations.reduce-useless-entity-move-packets", true,
+            "Drop zero-delta entity Pos packets from the 60-tick tracker resync. Purpur/Leaf.");
+        skipUnchangedEntityMotionPackets = getBoolean("optimizations.skip-unchanged-entity-motion-packets", true,
+            "Skip motion distanceToSqr when getDeltaMovement is the same Vec3 instance. SparklyPaper/Leaf.");
+        checkTargetRangeBeforeVisibility = getBoolean("optimizations.check-target-range-before-visibility", true,
+            "Reject out-of-range targets before getVisibilityPercent. Airplane/Leaf.");
+        villagerItemRepickup = getInt("optimizations.villager-item-repickup", 100,
+            "Ticks before a villager can pick up an item they threw. -1 is vanilla (10). Gale/Leaf.");
+        skipUnloadedChunksForGrassSpread = getBoolean("optimizations.skip-unloaded-chunks-for-grass-spread", true,
+            "Grass/mycelium do not load neighbor chunks to spread. Pluto/Leaf.");
+        skipItemMergeWhenFull = getBoolean("optimizations.skip-item-merge-when-full", true,
+            "Stop scanning merge neighbors once this stack is full. Leaf.");
 
         disableNaturalMobSpawning = getBoolean("gameplay.disable-natural-mob-spawning", false,
             "Disable natural (chunk) mob spawning. Spawners, eggs, and plugins still work.");

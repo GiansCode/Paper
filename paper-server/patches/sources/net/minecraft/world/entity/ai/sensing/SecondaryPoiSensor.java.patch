@@ -1,10 +1,17 @@
 --- a/net/minecraft/world/entity/ai/sensing/SecondaryPoiSensor.java
 +++ b/net/minecraft/world/entity/ai/sensing/SecondaryPoiSensor.java
-@@ -27,6 +_,7 @@
+@@ -27,11 +_,13 @@
          List<GlobalPos> jobSites = Lists.newArrayList();
          int horizontalSearch = 4;
  
-+        if (!body.getVillagerData().profession().value().secondaryPoi().isEmpty()) // Paper - Perf: Only scan world if Villager profession has secondary POI
++        final java.util.Set<net.minecraft.world.level.block.Block> secondaryPoi = body.getVillagerData().profession().value().secondaryPoi(); // NiceServer
++        if (!secondaryPoi.isEmpty()) // Paper - Perf: Only scan world if Villager profession has secondary POI
          for (int x = -4; x <= 4; x++) {
              for (int y = -2; y <= 2; y++) {
                  for (int z = -4; z <= 4; z++) {
+                     BlockPos testPos = center.offset(x, y, z);
+-                    if (body.getVillagerData().profession().value().secondaryPoi().contains(level.getBlockState(testPos).getBlock())) {
++                    if (secondaryPoi.contains(level.getBlockState(testPos).getBlock())) { // NiceServer - cache profession POI set
+                         jobSites.add(GlobalPos.of(dimensionType, testPos));
+                     }
+                 }

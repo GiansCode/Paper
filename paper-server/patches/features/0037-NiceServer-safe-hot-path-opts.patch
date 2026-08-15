@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Gianluca Falcomer <gianluca@niceserver>
+Date: Sat, 15 Aug 2026 23:30:00 +0200
+Subject: [PATCH] NiceServer: safe hot-path opts
+
+- skip zero-delta entity Pos packets (Purpur/Leaf)
+- skip motion distanceToSqr on identity Vec3 (SparklyPaper/Leaf)
+- do not load chunks to spread grass (Pluto/Leaf)
+
+diff --git a/net/minecraft/server/level/ServerEntity.java b/net/minecraft/server/level/ServerEntity.java
+--- a/net/minecraft/server/level/ServerEntity.java
++++ b/net/minecraft/server/level/ServerEntity.java
+@@ -176,11 +176,12 @@ public class ServerEntity {
+                 long ya = this.positionCodec.encodeY(currentPosition);
+                 long za = this.positionCodec.encodeZ(currentPosition);
+                 boolean deltaTooBig = xa < -32768L || xa > 32767L || ya < -32768L || ya > 32767L || za < -32768L || za > 32767L;
++                final boolean onGroundChanged = this.wasOnGround != this.entity.onGround(); // NiceServer
+                 if (this.forceStateResync || this.entity.getRequiresPrecisePosition() // Paper - fix desync when a player is added to the tracker
+                     || deltaTooBig
+                     || this.teleportDelay > 400
+                     || this.wasRiding
+-                    || this.wasOnGround != this.entity.onGround()) {
++                    || onGroundChanged) { // NiceServer
+                     this.wasOnGround = this.entity.onGround();
+                     this.teleportDelay = 0;
+                     packet = ClientboundEntityPositionSyncPacket.of(this.entity);
+@@ -199,9 +200,21 @@ public class ServerEntity {
+                     sentPosition = true;
+                     sentRotation = true;
+                 }
+ 
++                // NiceServer start - skip zero-delta Pos packets from the 60-tick resync
++                if (io.papermc.paper.niceserver.NiceServerConfig.reduceUselessEntityMovePackets
++                    && !onGroundChanged
++                    && packet instanceof ClientboundMoveEntityPacket.Pos move
++                    && move.getXa() == 0
++                    && move.getYa() == 0
++                    && move.getZa() == 0) {
++                    packet = null;
++                    sentPosition = false;
++                }
++                // NiceServer end
+                 if (this.entity.needsSync || this.trackDelta || this.entity instanceof LivingEntity livingEntity && livingEntity.isFallFlying()) {
+                     Vec3 movement = this.entity.getDeltaMovement();
++                    if (!io.papermc.paper.niceserver.NiceServerConfig.skipUnchangedEntityMotionPackets || movement != this.lastSentMovement) { // NiceServer
+                     double diff = movement.distanceToSqr(this.lastSentMovement);
+                     if (diff > 1.0E-7 || diff > 0.0 && movement.lengthSqr() == 0.0) {
+                         this.lastSentMovement = movement;
+@@ -219,7 +232,8 @@ public class ServerEntity {
+                         } else {
+                             this.synchronizer.sendToTrackingPlayers(new ClientboundSetEntityMotionPacket(this.entity.getId(), this.lastSentMovement));
+                         }
+                     }
++                    } // NiceServer
+                 }
+ 
+                 if (packet != null) {
+diff --git a/net/minecraft/world/level/block/SpreadingSnowyBlock.java b/net/minecraft/world/level/block/SpreadingSnowyBlock.java
+--- a/net/minecraft/world/level/block/SpreadingSnowyBlock.java
++++ b/net/minecraft/world/level/block/SpreadingSnowyBlock.java
+@@ -92,7 +92,14 @@ public abstract class SpreadingSnowyBlock extends SnowyBlock {
+                         if (cachedChunk.locX == testPos.getX() >> 4 && cachedChunk.locZ == testPos.getZ() >> 4) {
+                             access = cachedChunk;
+                         } else {
+-                            access = level.getChunkAt(testPos);
++                            // NiceServer start - Pluto: do not load chunks to spread grass
++                            access = io.papermc.paper.niceserver.NiceServerConfig.skipUnloadedChunksForGrassSpread
++                                ? level.getChunkIfLoadedImmediately(testPos.getX() >> 4, testPos.getZ() >> 4)
++                                : level.getChunkAt(testPos);
++                            if (access == null) {
++                                continue;
++                            }
++                            // NiceServer end
+                         }
+                         if (access.getBlockState(testPos).is(baseBlock.get()) && SpreadingSnowyBlock.canPropagate(access, defaultBlockState, testPos)) {
+                             org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockSpreadEvent(level, pos, testPos, defaultBlockState.setValue(SNOWY, isSnowySetting(access.getBlockState(testPos.above()))), Block.UPDATE_ALL); // CraftBukkit

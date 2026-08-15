@@ -8,10 +8,13 @@
          double yHandPos = thrower.getEyeY() - handYDistanceFromEye;
          ItemEntity itemEntity = new ItemEntity(thrower.level(), thrower.getX(), yHandPos, thrower.getZ(), item);
          itemEntity.setThrower(thrower);
-@@ -101,6 +_,13 @@
+@@ -101,6 +_,16 @@
          throwVector = throwVector.normalize().multiply(throwVelocity.x, throwVelocity.y, throwVelocity.z);
          itemEntity.setDeltaMovement(throwVector);
          itemEntity.setDefaultPickUpDelay();
++        if (io.papermc.paper.niceserver.NiceServerConfig.villagerItemRepickup >= 0 && thrower instanceof net.minecraft.world.entity.npc.villager.Villager) {
++            itemEntity.pickupDelay = io.papermc.paper.niceserver.NiceServerConfig.villagerItemRepickup; // NiceServer - Gale villager re-pickup delay
++        }
 +        // CraftBukkit start
 +        org.bukkit.event.entity.EntityDropItemEvent event = new org.bukkit.event.entity.EntityDropItemEvent(thrower.getBukkitEntity(), (org.bukkit.entity.Item) itemEntity.getBukkitEntity());
 +        itemEntity.level().getCraftServer().getPluginManager().callEvent(event);
