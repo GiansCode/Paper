@@ -242,13 +242,16 @@
      }
  
      private void playBrokenSound() {
-@@ -459,9 +_,37 @@
+@@ -459,9 +_,40 @@
          return this.isSmall();
      }
  
 +    // Paper start - Allow ArmorStands not to tick
 +    @Override
 +    public void tick() {
++        if (io.papermc.paper.niceserver.NiceServerConfig.skipMarkerArmorStandTick && this.isMarker()) {
++            return;
++        }
 +        if (!this.canTick) {
 +            if (this.noTickEquipmentDirty) {
 +                this.noTickEquipmentDirty = false;

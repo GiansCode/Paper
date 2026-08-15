@@ -15,7 +15,12 @@ public class UnmodifiableAttributeInstance extends CraftAttributeInstance {
     }
 
     @Override
-    public void setBaseValue(double d) {
+    public void setBaseValue(double value) {
+        throw new UnsupportedOperationException("Cannot modify default attributes");
+    }
+
+    @Override
+    public void removeModifier(net.kyori.adventure.key.Key key) {
         throw new UnsupportedOperationException("Cannot modify default attributes");
     }
 

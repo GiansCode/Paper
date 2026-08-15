@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/chunk/LevelChunk.java
 +++ b/net/minecraft/world/level/chunk/LevelChunk.java
-@@ -87,13 +_,21 @@
+@@ -87,13 +_,22 @@
      };
      private final Map<BlockPos, LevelChunk.RebindableTickingBlockEntityWrapper> tickersInLevel = Maps.newHashMap();
      private boolean loaded;
@@ -15,6 +15,7 @@
 +    // CraftBukkit start
 +    public boolean mustNotSave;
 +    public boolean needsDecoration;
++    public boolean pluginUnloadWithoutSave; // Paper - World.unloadChunk(save=false) must not persist entities
 +    // CraftBukkit end
 +
 +    // Paper start

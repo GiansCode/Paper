@@ -272,7 +272,7 @@
 +        uniqueId = gameprofile.id();
 +        // Paper end - Add more fields to AsyncPlayerPreLoginEvent
 +
-+        if (PlayerPreLoginEvent.getHandlerList().getRegisteredListeners().length != 0) {
++        if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(PlayerPreLoginEvent.getHandlerList())) {
 +            final PlayerPreLoginEvent event = new PlayerPreLoginEvent(playerName, address, uniqueId);
 +            if (asyncEvent.getResult() != PlayerPreLoginEvent.Result.ALLOWED) {
 +                event.disallow(asyncEvent.getResult(), asyncEvent.kickMessage()); // Paper - Adventure

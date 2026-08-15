@@ -72,10 +72,12 @@
              }
          }
      }
-@@ -211,9 +_,18 @@
+@@ -211,9 +_,20 @@
  
      private void mergeWithNeighbours() {
          if (this.isMergable()) {
++            if (io.papermc.paper.niceserver.NiceServerConfig.disableItemMerging) return; // NiceServer
++            if (io.papermc.paper.niceserver.NiceServerConfig.itemMergeInterval > 1 && this.tickCount % io.papermc.paper.niceserver.NiceServerConfig.itemMergeInterval != 0) return; // NiceServer
 +            double radius = this.level().spigotConfig.itemMerge; // Spigot
              for (ItemEntity entity : this.level()
 -                .getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(0.5, 0.0, 0.5), other -> other != this && other.isMergable())) {

@@ -207,6 +207,18 @@ public class HandlerList {
     }
 
     /**
+     * @return true if at least one listener is registered
+     */
+    public boolean hasRegisteredListeners() {
+        RegisteredListener[] baked = this.handlers;
+        if (baked == null) {
+            this.bake();
+            baked = this.handlers;
+        }
+        return baked.length != 0;
+    }
+
+    /**
      * Get a specific plugin's registered listeners associated with this
      * handler list
      *

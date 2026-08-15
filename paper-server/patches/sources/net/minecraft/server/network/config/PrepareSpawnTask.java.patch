@@ -106,7 +106,7 @@
              Vec3 spawnPosition = this.spawnPosition.join();
              if (this.chunkLoadFuture == null) {
 +                // Paper start - PlayerSpawnLocationEvent
-+                if (this.eventFuture == null && org.spigotmc.event.player.PlayerSpawnLocationEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                if (this.eventFuture == null && io.papermc.paper.niceserver.NiceServerConfig.shouldCall(org.spigotmc.event.player.PlayerSpawnLocationEvent.getHandlerList())) {
 +                    ServerPlayer player;
 +                    if (PrepareSpawnTask.this.listener.connection.savedPlayerForLegacyEvents != null) {
 +                        player = PrepareSpawnTask.this.listener.connection.savedPlayerForLegacyEvents;
@@ -130,7 +130,7 @@
 +                    this.spawnAngle = new Vec2(ev.getSpawnLocation().getYaw(), ev.getSpawnLocation().getPitch());
 +                }
 +
-+                if (this.eventFuture == null && io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                if (this.eventFuture == null && io.papermc.paper.niceserver.NiceServerConfig.shouldCall(io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent.getHandlerList())) {
 +                    final Vec3 spawnPositionFinal = spawnPosition;
 +                    this.eventFuture = CompletableFuture.supplyAsync(() -> {
 +                        io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent ev = new io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent(

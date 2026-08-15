@@ -73,7 +73,7 @@
      }
  
      public @Nullable T spawn(
-@@ -165,9 +_,39 @@
+@@ -165,9 +_,41 @@
          final boolean tryMoveDown,
          final boolean movedUp
      ) {
@@ -93,13 +93,15 @@
 +    ) {
 +        // CraftBukkit end
 +        // Paper start - PreCreatureSpawnEvent
-+        com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent event = new com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent(
-+            org.bukkit.craftbukkit.util.CraftLocation.toBukkit(spawnPos, level),
-+            org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(this),
-+            creatureSpawnReason
-+        );
-+        if (!event.callEvent()) {
-+            return null;
++        if (!io.papermc.paper.niceserver.NiceServerConfig.disablePrecatureSpawnEvent && io.papermc.paper.niceserver.NiceServerConfig.shouldCall(com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent.getHandlerList())) {
++            com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent event = new com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent(
++                org.bukkit.craftbukkit.util.CraftLocation.toBukkit(spawnPos, level),
++                org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(this),
++                creatureSpawnReason
++            );
++            if (!event.callEvent()) {
++                return null;
++            }
 +        }
 +        // Paper end - PreCreatureSpawnEvent
          T entity = this.create(level, postSpawnConfig, spawnPos, spawnReason, tryMoveDown, movedUp);

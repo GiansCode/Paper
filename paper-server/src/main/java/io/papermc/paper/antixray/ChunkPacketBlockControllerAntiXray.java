@@ -291,10 +291,19 @@ public final class ChunkPacketBlockControllerAntiXray extends ChunkPacketBlockCo
                     BlockState[] presetBlockStatesFull = chunkPacketInfoAntiXray.getPresetValues(chunkSectionIndex) == presetBlockStates ? this.presetBlockStatesFull : chunkPacketInfoAntiXray.getPresetValues(chunkSectionIndex);
                     presetBlockStateBitsTemp = presetBlockStateBits;
 
-                    for (int i = 0; i < presetBlockStateBitsTemp.length; i++) {
-                        // This is thread safe because we only request IDs that are guaranteed to be in the palette and are visible
-                        // For more details see the comments in the readPalette method
-                        presetBlockStateBitsTemp[i] = chunkPacketInfoAntiXray.getPalette(chunkSectionIndex).idFor(presetBlockStatesFull[i], PaletteResize.noResizeExpected());
+                    try {
+                        for (int i = 0; i < presetBlockStateBitsTemp.length; i++) {
+                            // This is thread safe because we only request IDs that are guaranteed to be in the palette and are visible
+                            // For more details see the comments in the readPalette method
+                            presetBlockStateBitsTemp[i] = chunkPacketInfoAntiXray.getPalette(chunkSectionIndex).idFor(presetBlockStatesFull[i], PaletteResize.noResizeExpected());
+                        }
+                    } catch (final IllegalStateException ex) {
+                        // Migrated/modded chunks can have palettes that do not contain the expected preset entries.
+                        // Skip obfuscation for this section instead of crashing the chunk worker.
+                        if (io.papermc.paper.niceserver.NiceServerConfig.skipAntiXrayOnBadPalette) {
+                            continue;
+                        }
+                        throw ex;
                     }
                 }
 

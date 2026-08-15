@@ -16,6 +16,14 @@
          this.leftOwner = input.getBooleanOr("LeftOwner", false);
          this.hasBeenShot = input.getBooleanOr("HasBeenShot", false);
      }
+@@ -98,4 +_,7 @@
+     public void tick() {
++        if (io.papermc.paper.niceserver.NiceServerConfig.tryDespawnProjectile(this)) {
++            return;
++        }
+         if (!this.hasBeenShot) {
+             this.gameEvent(GameEvent.PROJECTILE_SHOOT, this.getOwner());
+             this.hasBeenShot = true;
 @@ -155,7 +_,14 @@
          float zd = Mth.cos(yRot * Mth.DEG_TO_RAD) * Mth.cos(xRot * Mth.DEG_TO_RAD);
          this.shoot(xd, yd, zd, pow, uncertainty);

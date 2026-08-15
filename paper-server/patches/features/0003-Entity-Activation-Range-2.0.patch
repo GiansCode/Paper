@@ -597,7 +597,7 @@ index 706a7ce383afef9d80197afafcb6e6dab138ae29..66839736d997f5c911dfd9cf251b0d44
 +    // Paper start - EAR 2
 +    public boolean inactiveTick() {
 +        this.curRate++;
-+        return this.curRate % 3 == 0; // TODO newGoalRate was already unused in 1.20.4, check if this is correct
++        return this.curRate % io.papermc.paper.niceserver.NiceServerConfig.inactiveGoalSelectorInterval == 0; // Paper - EAR 2 // NiceServer inactive-goal-selector-interval
 +    }
 +
 +    public boolean hasTasks() {

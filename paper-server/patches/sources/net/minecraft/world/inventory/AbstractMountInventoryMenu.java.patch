@@ -32,3 +32,9 @@
          this.mountContainer = mountInventory;
          this.mount = mount;
          mountInventory.startOpen(playerInventory.player);
+@@ -25,4 +_,5 @@
+ 
+     @Override
+     public boolean stillValid(final Player player) {
++        if (!this.checkReachable) return true; // CraftBukkit
+         return !this.hasInventoryChanged(this.mountContainer)

@@ -762,8 +762,7 @@ public class CraftEventFactory {
         // Spigot start - SPIGOT-7523: Merge after spawn event and only merge if the event was not cancelled (gets checked above)
         if (entity instanceof net.minecraft.world.entity.ExperienceOrb xp) {
             double radius = level.spigotConfig.expMerge;
-            event = CraftEventFactory.callEntitySpawnEvent(entity); // Call spawn event for ExperienceOrb entities
-            if (radius > 0 && !event.isCancelled() && !entity.isRemoved()) {
+            if (radius > 0) {
                 // Paper start - Maximum exp value when merging; Whole section has been tweaked, see comments for specifics
                 final long maxValue = level.paperConfig().entities.behavior.experienceMergeMaxValue;
                 final boolean mergeUnconditionally = maxValue <= 0;
@@ -827,11 +826,16 @@ public class CraftEventFactory {
         org.bukkit.entity.Item entity = (org.bukkit.entity.Item) item.getBukkitEntity();
 
         ItemDespawnEvent event = new ItemDespawnEvent(entity, entity.getLocation());
-        entity.getServer().getPluginManager().callEvent(event);
+        if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(ItemDespawnEvent.getHandlerList())) {
+            entity.getServer().getPluginManager().callEvent(event);
+        }
         return event;
     }
 
     public static boolean callItemMergeEvent(ItemEntity merging, ItemEntity mergingWith) {
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(ItemMergeEvent.getHandlerList())) {
+            return true;
+        }
         org.bukkit.entity.Item entityMerging = (org.bukkit.entity.Item) merging.getBukkitEntity();
         org.bukkit.entity.Item entityMergingWith = (org.bukkit.entity.Item) mergingWith.getBukkitEntity();
 
@@ -946,6 +950,16 @@ public class CraftEventFactory {
 
         CraftBlockState snapshot = CraftBlockStates.getBlockState(level, target);
         snapshot.setBlock(state);
+
+        if (io.papermc.paper.niceserver.NiceServerConfig.disableGrassSpread
+            && (state.is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK) || state.is(net.minecraft.world.level.block.Blocks.MYCELIUM))) {
+            return false;
+        }
+
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(BlockSpreadEvent.getHandlerList())) {
+            boolean result = snapshot.place(flags);
+            return !checkSetResult || result;
+        }
 
         BlockSpreadEvent event = new BlockSpreadEvent(snapshot.getBlock(), CraftBlock.at(level, CraftEventFactory.sourceBlockOverride != null ? CraftEventFactory.sourceBlockOverride : source), snapshot);
         if (event.callEvent()) {
@@ -1277,6 +1291,11 @@ public class CraftEventFactory {
         CraftBlockState snapshot = CraftBlockStates.getBlockState(level, pos);
         snapshot.setBlock(state);
 
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(BlockGrowEvent.getHandlerList())) {
+            snapshot.place(flags);
+            return true;
+        }
+
         BlockGrowEvent event = new BlockGrowEvent(snapshot.getBlock(), snapshot);
         if (event.callEvent()) {
             snapshot.place(flags);
@@ -1375,7 +1394,9 @@ public class CraftEventFactory {
 
     public static EntityTargetLivingEntityEvent callEntityTargetLivingEvent(Entity entity, net.minecraft.world.entity.LivingEntity target, EntityTargetEvent.TargetReason reason) {
         EntityTargetLivingEntityEvent event = new EntityTargetLivingEntityEvent(entity.getBukkitEntity(), (target == null) ? null : (LivingEntity) target.getBukkitEntity(), reason);
-        entity.getBukkitEntity().getServer().getPluginManager().callEvent(event);
+        if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(EntityTargetLivingEntityEvent.getHandlerList())) {
+            entity.getBukkitEntity().getServer().getPluginManager().callEvent(event);
+        }
         return event;
     }
 
@@ -1870,6 +1891,10 @@ public class CraftEventFactory {
         CraftItemStack bredWithStack = bredWith == null ? null : CraftItemStack.asCraftMirror(bredWith).clone();
 
         EntityBreedEvent event = new EntityBreedEvent((LivingEntity) child.getBukkitEntity(), (LivingEntity) mother.getBukkitEntity(), (LivingEntity) father.getBukkitEntity(), breederEntity, bredWithStack, experience);
+        if (io.papermc.paper.niceserver.NiceServerConfig.disableVillagerBreeding && child instanceof net.minecraft.world.entity.npc.villager.Villager) {
+            event.setCancelled(true);
+            return event;
+        }
         event.callEvent();
         return event;
     }
@@ -1925,6 +1950,11 @@ public class CraftEventFactory {
     public static boolean handleBlockFormEvent(Level level, BlockPos pos, net.minecraft.world.level.block.state.BlockState state, @net.minecraft.world.level.block.Block.UpdateFlags int flags, @Nullable Entity entity, boolean checkSetResult) {
         CraftBlockState snapshot = CraftBlockStates.getBlockState(level, pos);
         snapshot.setBlock(state);
+
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(entity == null ? BlockFormEvent.getHandlerList() : EntityBlockFormEvent.getHandlerList())) {
+            boolean result = snapshot.place(flags);
+            return !checkSetResult || result;
+        }
 
         BlockFormEvent event = (entity == null) ? new BlockFormEvent(snapshot.getBlock(), snapshot) : new EntityBlockFormEvent(entity.getBukkitEntity(), snapshot.getBlock(), snapshot);
         if (event.callEvent()) {
@@ -2313,7 +2343,7 @@ public class CraftEventFactory {
     }
 
     public static boolean callTransporterValidateTarget(final PathfinderMob mob, final Level level, final BlockPos transportItemTarget) {
-        if (ItemTransportingEntityValidateTargetEvent.getHandlerList().getRegisteredListeners().length == 0) {
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(ItemTransportingEntityValidateTargetEvent.getHandlerList())) {
             return true; // No listeners, skip event creation
         }
         final ItemTransportingEntityValidateTargetEvent event = new ItemTransportingEntityValidateTargetEvent(mob.getBukkitEntity(), CraftBlock.at(level, transportItemTarget));
@@ -2415,7 +2445,7 @@ public class CraftEventFactory {
     }
 
     public static int callEntityIgniteEvent(Entity entity, int fuseTime) {
-        if (EntityIgniteEvent.getHandlerList().getRegisteredListeners().length == 0) {
+        if (!io.papermc.paper.niceserver.NiceServerConfig.shouldCall(EntityIgniteEvent.getHandlerList())) {
             return fuseTime; // No listeners, skip event creation
         }
 

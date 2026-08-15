@@ -139,7 +139,7 @@
              }
  
              return null;
-@@ -411,19 +_,112 @@
+@@ -411,19 +_,114 @@
      }
  
      public void sendCommands(final ServerPlayer player) {
@@ -191,7 +191,9 @@
 +        // Paper end - Perf: Async command map building
 +        new com.destroystokyo.paper.event.brigadier.AsyncPlayerSendCommandsEvent<CommandSourceStack>(player.getBukkitEntity(), (RootCommandNode) root, true).callEvent(); // Paper - Brigadier API
 +        org.bukkit.event.player.PlayerCommandSendEvent event = new org.bukkit.event.player.PlayerCommandSendEvent(player.getBukkitEntity(), new java.util.LinkedHashSet<>(bukkit));
++        if (!io.papermc.paper.niceserver.NiceServerConfig.skipPlayerCommandSendEventIfNoListeners || io.papermc.paper.niceserver.NiceServerConfig.shouldCall(org.bukkit.event.player.PlayerCommandSendEvent.getHandlerList())) {
 +        event.getPlayer().getServer().getPluginManager().callEvent(event);
++        }
 +
 +        // Remove labels that were removed during the event
 +        for (String orig : bukkit) {

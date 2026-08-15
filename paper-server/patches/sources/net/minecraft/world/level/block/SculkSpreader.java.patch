@@ -17,8 +17,9 @@
      }
  
      public void save(final ValueOutput output) {
-@@ -126,13 +_,24 @@
+@@ -126,13 +_,25 @@
      public void addCursors(final BlockPos startPos, int charge) {
++        if (io.papermc.paper.niceserver.NiceServerConfig.disableSculkSpreading) return; // NiceServer
          while (charge > 0) {
              int currentCharge = Math.min(charge, 1000);
 -            this.addCursor(new SculkSpreader.ChargeCursor(startPos, currentCharge));

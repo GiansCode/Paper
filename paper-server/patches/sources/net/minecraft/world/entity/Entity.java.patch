@@ -492,7 +492,7 @@
      }
  
      public boolean isFree(final double xa, final double ya, final double za) {
-@@ -709,7 +_,28 @@
+@@ -709,7 +_,45 @@
          return this.onGround;
      }
  
@@ -505,6 +505,7 @@
 +    private double moveStartY;
 +    private double moveStartZ;
 +    // Paper end - detailed watchdog information
++    private boolean boundingBoxChanged; // Paper - skip entity move if movement is zero
 +
      public void move(final MoverType moverType, Vec3 delta) {
 +        final Vec3 originalMovement = delta; // Paper - Expose pre-collision velocity
@@ -518,10 +519,26 @@
 +        }
 +        try {
 +        // Paper end - detailed watchdog information
++        // Paper start - skip entity move if movement is zero
++        if (io.papermc.paper.niceserver.NiceServerConfig.skipZeroMovement && !this.noPhysics && !this.boundingBoxChanged && delta.x == 0.0 && delta.y == 0.0 && delta.z == 0.0) {
++            return;
++        }
++        this.boundingBoxChanged = false;
++        // Paper end - skip entity move if movement is zero
++        // NiceServer start - prevent moving into unloaded chunks
++        if (!(this instanceof net.minecraft.world.entity.player.Player) && (io.papermc.paper.niceserver.NiceServerConfig.preventMovingIntoUnloadedChunks || (io.papermc.paper.niceserver.NiceServerConfig.reduceProjectileChunkLoading && this instanceof net.minecraft.world.entity.projectile.Projectile))) {
++            final int destChunkX = net.minecraft.util.Mth.floor(this.getX() + delta.x) >> 4;
++            final int destChunkZ = net.minecraft.util.Mth.floor(this.getZ() + delta.z) >> 4;
++            final net.minecraft.world.level.ChunkPos current = this.chunkPosition();
++            if ((destChunkX != current.x() || destChunkZ != current.z()) && this.level().getChunkIfLoadedImmediately(destChunkX, destChunkZ) == null) {
++                return;
++            }
++        }
++        // NiceServer end - prevent moving into unloaded chunks
          if (this.noPhysics) {
              this.setPos(this.getX() + delta.x, this.getY() + delta.y, this.getZ() + delta.z);
              this.horizontalCollision = false;
-@@ -785,6 +_,27 @@
+@@ -785,6 +_,31 @@
                  if (this.canSimulateMovement() && (movedVertically && this.verticalCollision || this.horizontalCollision)) {
                      this.restituteMovementAfterCollisions(effectState, xCollision, zCollision, movement);
                  }
@@ -541,8 +558,12 @@
 +                    }
 +
 +                    if (!block.getType().isAir()) {
-+                        org.bukkit.event.vehicle.VehicleBlockCollisionEvent event = new org.bukkit.event.vehicle.VehicleBlockCollisionEvent(vehicle, block, org.bukkit.craftbukkit.util.CraftVector.toBukkit(originalMovement)); // Paper - Expose pre-collision velocity
-+                        event.callEvent();
++                        // Paper start - Guard VehicleBlockCollisionEvent when no plugins listen
++                        if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(org.bukkit.event.vehicle.VehicleBlockCollisionEvent.getHandlerList())) {
++                            org.bukkit.event.vehicle.VehicleBlockCollisionEvent event = new org.bukkit.event.vehicle.VehicleBlockCollisionEvent(vehicle, block, org.bukkit.craftbukkit.util.CraftVector.toBukkit(originalMovement)); // Paper - Expose pre-collision velocity
++                            event.callEvent();
++                        }
++                        // Paper end - Guard VehicleBlockCollisionEvent when no plugins listen
 +                    }
 +                }
 +                // CraftBukkit end
@@ -620,7 +641,7 @@
              if (!entity.noPhysics && !this.noPhysics) {
 +                if (this.level.paperConfig().collisions.onlyPlayersCollide && !(entity instanceof ServerPlayer || this instanceof ServerPlayer)) return; // Paper - Collision option for requiring a player participant
 +                // Paper start - Add EntityCollideWithEntity Event
-+                if (io.papermc.paper.event.entity.EntityCollideWithEntityEvent.getHandlerList().getRegisteredListeners().length != 0 &&
++                if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(io.papermc.paper.event.entity.EntityCollideWithEntityEvent.getHandlerList()) &&
 +                    !new io.papermc.paper.event.entity.EntityCollideWithEntityEvent(this.getBukkitEntity(), entity.getBukkitEntity()).callEvent()) return;
 +                // Paper end - Add EntityCollideWithEntity Event
 +
@@ -1627,7 +1648,7 @@
      }
  
      public void teleportTo(final double x, final double y, final double z) {
-@@ -3454,7 +_,26 @@
+@@ -3454,7 +_,29 @@
      }
  
      public final void setBoundingBox(final AABB bb) {
@@ -1650,6 +1671,9 @@
 +        len = bb.maxZ - bb.minZ;
 +        if (len < 0) maxZ = minZ;
 +        if (len > 64) maxZ = minZ + 64.0;
++        if (this.bb.minX != minX || this.bb.minY != minY || this.bb.minZ != minZ || this.bb.maxX != maxX || this.bb.maxY != maxY || this.bb.maxZ != maxZ) {
++            this.boundingBoxChanged = true; // Paper - skip entity move if movement is zero
++        }
 +        this.bb = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
 +        // CraftBukkit end
      }

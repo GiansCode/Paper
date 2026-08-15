@@ -1,5 +1,13 @@
 --- a/net/minecraft/world/item/MapItem.java
 +++ b/net/minecraft/world/item/MapItem.java
+@@ -76,4 +_,7 @@
+     public void update(final Level level, final Entity player, final MapItemSavedData data) {
++        if (io.papermc.paper.niceserver.NiceServerConfig.skipMapUpdatesWithoutVanillaRenderer && data.mapView.isVirtual()) {
++            return;
++        }
+         if (level.dimension() == data.dimension && player instanceof Player player2) {
+             int scale = 1 << data.scale;
+             int centerX = data.centerX;
 @@ -103,10 +_,10 @@
                              int averagingAreaMinX = (centerX / scale + imgX - 64) * scale;
                              int averagingAreaMinZ = (centerZ / scale + imgY - 64) * scale;

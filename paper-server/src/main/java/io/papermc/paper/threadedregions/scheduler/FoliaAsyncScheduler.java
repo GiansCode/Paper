@@ -23,25 +23,40 @@ public final class FoliaAsyncScheduler implements AsyncScheduler {
 
     private static final Logger LOGGER = LogUtils.getClassLogger();
 
-    private final Executor executors = new ThreadPoolExecutor(Math.max(4, Runtime.getRuntime().availableProcessors() / 2), Integer.MAX_VALUE,
-        30L, TimeUnit.SECONDS, new SynchronousQueue<>(),
-        new ThreadFactory() {
-            private final AtomicInteger idGenerator = new AtomicInteger();
+    private Executor executors;
 
-            @Override
-            public Thread newThread(final Runnable run) {
-                final Thread ret = new Thread(run);
+    private Executor executor() {
+        Executor executor = this.executors;
+        if (executor == null) {
+            synchronized (this) {
+                executor = this.executors;
+                if (executor == null) {
+                    this.executors = executor = io.papermc.paper.niceserver.NiceServerConfig.useVirtualThreadsForAsyncScheduler
+                        ? Executors.newThreadPerTaskExecutor(Thread.ofVirtual()
+                            .name("Folia Async Scheduler Thread #", 0)
+                            .uncaughtExceptionHandler((final Thread thread, final Throwable thr) -> LOGGER.error("Uncaught exception in thread: " + thread.getName(), thr))
+                            .factory())
+                        : new ThreadPoolExecutor(Math.max(4, Runtime.getRuntime().availableProcessors() / 2), Integer.MAX_VALUE,
+                            30L, TimeUnit.SECONDS, new SynchronousQueue<>(),
+                            new ThreadFactory() {
+                                private final AtomicInteger idGenerator = new AtomicInteger();
 
-                ret.setName("Folia Async Scheduler Thread #" + this.idGenerator.getAndIncrement());
-                ret.setPriority(Thread.NORM_PRIORITY - 1);
-                ret.setUncaughtExceptionHandler((final Thread thread, final Throwable thr) -> {
-                    LOGGER.error("Uncaught exception in thread: " + thread.getName(), thr);
-                });
-
-                return ret;
+                                @Override
+                                public Thread newThread(final Runnable run) {
+                                    final Thread ret = new Thread(run);
+                                    ret.setName("Folia Async Scheduler Thread #" + this.idGenerator.getAndIncrement());
+                                    ret.setPriority(Thread.NORM_PRIORITY - 1);
+                                    ret.setUncaughtExceptionHandler((final Thread thread, final Throwable thr) -> {
+                                        LOGGER.error("Uncaught exception in thread: " + thread.getName(), thr);
+                                    });
+                                    return ret;
+                                }
+                            });
+                }
             }
         }
-    );
+        return executor;
+    }
 
     private final ScheduledExecutorService timerThread = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
         @Override
@@ -72,7 +87,7 @@ public final class FoliaAsyncScheduler implements AsyncScheduler {
         final AsyncScheduledTask ret = new AsyncScheduledTask(plugin, -1L, task, null, -1L);
 
         this.tasks.add(ret);
-        this.executors.execute(ret);
+        this.executor().execute(ret);
 
         if (!plugin.isEnabled()) {
             // handle race condition where plugin is disabled asynchronously
@@ -208,7 +223,7 @@ public final class FoliaAsyncScheduler implements AsyncScheduler {
             if (timer) {
                 // the scheduled executor is single thread, and unfortunately not expandable with threads
                 // so we just schedule onto the executor
-                FoliaAsyncScheduler.this.executors.execute(this);
+                FoliaAsyncScheduler.this.executor().execute(this);
                 return;
             }
 
@@ -233,6 +248,7 @@ public final class FoliaAsyncScheduler implements AsyncScheduler {
                         this.delay = FoliaAsyncScheduler.this.timerThread.schedule(this, delay, TimeUnit.NANOSECONDS);
                     } else {
                         // cancelled repeating task
+                        this.state = STATE_CANCELLED;
                         removeFromTasks = true;
                     }
                 }

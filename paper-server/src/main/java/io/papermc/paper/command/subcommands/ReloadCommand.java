@@ -26,6 +26,7 @@ public final class ReloadCommand implements PaperSubcommand {
 
         MinecraftServer server = ((CraftServer) sender.getServer()).getServer();
         server.paperConfigurations.reloadConfigs(server);
+        io.papermc.paper.niceserver.NiceServerConfig.init();
         server.server.reloadCount++;
 
         Command.broadcastCommandMessage(sender, text("Paper config reload complete.", GREEN));

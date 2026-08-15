@@ -32,6 +32,9 @@ public class PermissionConfigurationSerializer {
             } else {
                 permissionDefault = PermissionDefault.getByName(permNode.getString());
             }
+            if (permissionDefault == null) {
+                throw new SerializationException("defaultPerm is not a valid choice");
+            }
 
             List<Permission> result = new ArrayList<>();
             if (map != null) {

@@ -39,22 +39,24 @@
              } else {
                  boolean delay = false;
                  RandomSource random = level.getRandom();
-@@ -131,6 +_,21 @@
+@@ -131,6 +_,23 @@
                                  continue;
                              }
  
 +                            // Paper start - PreCreatureSpawnEvent
-+                            com.destroystokyo.paper.event.entity.PreSpawnerSpawnEvent event = new com.destroystokyo.paper.event.entity.PreSpawnerSpawnEvent(
-+                                org.bukkit.craftbukkit.util.CraftLocation.toBukkit(spawnPos, level),
-+                                org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(entityType.get()),
-+                                org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level)
-+                            );
-+                            if (!event.callEvent()) {
-+                                delay = true;
-+                                if (event.shouldAbortSpawn()) {
-+                                    break;
++                            if (!io.papermc.paper.niceserver.NiceServerConfig.disablePrecatureSpawnEvent && io.papermc.paper.niceserver.NiceServerConfig.shouldCall(com.destroystokyo.paper.event.entity.PreSpawnerSpawnEvent.getHandlerList())) {
++                                com.destroystokyo.paper.event.entity.PreSpawnerSpawnEvent event = new com.destroystokyo.paper.event.entity.PreSpawnerSpawnEvent(
++                                    org.bukkit.craftbukkit.util.CraftLocation.toBukkit(spawnPos, level),
++                                    org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(entityType.get()),
++                                    org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level)
++                                );
++                                if (!event.callEvent()) {
++                                    delay = true;
++                                    if (event.shouldAbortSpawn()) {
++                                        break;
++                                    }
++                                    continue;
 +                                }
-+                                continue;
 +                            }
 +                            // Paper end - PreCreatureSpawnEvent
 +

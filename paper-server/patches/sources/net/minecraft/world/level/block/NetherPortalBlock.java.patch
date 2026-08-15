@@ -5,7 +5,7 @@
      @Override
      protected void randomTick(final BlockState state, final ServerLevel level, BlockPos pos, final RandomSource random) {
 -        if (level.isSpawningMonsters()
-+        if (level.spigotConfig.enableZombiePigmenPortalSpawns && level.isSpawningMonsters() // Paper
++        if (!io.papermc.paper.niceserver.NiceServerConfig.disableNetherPortalSpawn && level.spigotConfig.enableZombiePigmenPortalSpawns && level.isSpawningMonsters() // Paper // NiceServer
              && level.getLevelData().getDifficulty() != Difficulty.PEACEFUL
              && level.environmentAttributes().getValue(EnvironmentAttributes.NETHER_PORTAL_SPAWNS_PIGLINS, pos)
              && random.nextInt(2000) < level.getDifficulty().getId()
@@ -28,7 +28,7 @@
          final InsideBlockEffectApplier effectApplier,
          final boolean isPrecise
      ) {
-+        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.niceserver.NiceServerConfig.shouldCall(io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList()) && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent; Guard when no plugins listen
          if (entity.canUsePortal(false)) {
 +            // CraftBukkit start - Entity in portal
 +            org.bukkit.event.entity.EntityPortalEnterEvent event = new org.bukkit.event.entity.EntityPortalEnterEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level), org.bukkit.PortalType.NETHER); // Paper - add portal type

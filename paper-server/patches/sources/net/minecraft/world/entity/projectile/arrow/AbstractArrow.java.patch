@@ -39,6 +39,13 @@
          if (this.isInGround() && movement.lengthSqr() > 0.0) {
              this.setInGround(false);
          }
+@@ -174,3 +_,6 @@
+     @Override
+     public void tick() {
++        if (io.papermc.paper.niceserver.NiceServerConfig.tryDespawnProjectile(this)) {
++            return;
++        }
+         boolean physicsEnabled = !this.isNoPhysics();
 @@ -218,6 +_,10 @@
                  this.setSharedFlagOnFire(this.getRemainingFireTicks() > 0);
              }
@@ -108,13 +115,13 @@
      }
  
      public boolean isInGround() {
-@@ -382,8 +_,8 @@
+@@ -382,8 +_,14 @@
  
      protected void tickDespawn() {
          this.life++;
 -        if (this.life >= 1200) {
 -            this.discard();
-+        if (this.life >= (this.pickup == Pickup.CREATIVE_ONLY ? this.level().paperConfig().entities.spawning.creativeArrowDespawnRate.value() : (this.pickup == Pickup.DISALLOWED ? this.level().paperConfig().entities.spawning.nonPlayerArrowDespawnRate.value() : ((this instanceof ThrownTrident) ? this.level().spigotConfig.tridentDespawnRate : this.level().spigotConfig.arrowDespawnRate)))) { // Spigot // Paper - Configurable non-player arrow despawn rate; TODO: Extract this to init?
++        if (this.life >= (this.pickup == Pickup.CREATIVE_ONLY ? this.level().paperConfig().entities.spawning.creativeArrowDespawnRate.value() : (this.pickup == Pickup.DISALLOWED ? this.level().paperConfig().entities.spawning.nonPlayerArrowDespawnRate.value() : ((this instanceof ThrownTrident) ? this.level().spigotConfig.tridentDespawnRate : (io.papermc.paper.niceserver.NiceServerConfig.playerArrowDespawnRate > 0 ? io.papermc.paper.niceserver.NiceServerConfig.playerArrowDespawnRate : this.level().spigotConfig.arrowDespawnRate))))) { // Spigot // Paper - Configurable non-player arrow despawn rate; NiceServer player-arrow-despawn-rate
 +            this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause
          }
      }
@@ -209,6 +216,11 @@
  
          this.pickup = switch (owner) {
              case Player ignored when this.pickup == AbstractArrow.Pickup.DISALLOWED -> AbstractArrow.Pickup.ALLOWED;
+@@ -646,3 +_,4 @@
+             case null, default -> this.pickup;
+         };
++        io.papermc.paper.niceserver.NiceServerConfig.limitPlayerArrows(this); // NiceServer - gameplay.max-player-arrows
+     }
 @@ -650,17 +_,29 @@
      @Override
      public void playerTouch(final Player player) {

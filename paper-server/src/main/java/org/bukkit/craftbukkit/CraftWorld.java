@@ -466,6 +466,9 @@ public class CraftWorld extends CraftRegionAccessor implements World {
 
         if (!save) {
             chunk.tryMarkSaved(); // Use method call to account for persistentDataContainer
+            if (io.papermc.paper.niceserver.NiceServerConfig.skipEntitySaveOnUnloadWithoutSave) {
+                chunk.pluginUnloadWithoutSave = true; // Paper - unloadChunk(save=false) must not persist entities either
+            }
         }
         this.unloadChunkRequest(x, z);
 

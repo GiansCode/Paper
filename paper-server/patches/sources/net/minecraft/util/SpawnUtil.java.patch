@@ -33,24 +33,26 @@
          BlockPos.MutableBlockPos searchPos = start.mutable();
          RandomSource random = level.getRandom();
  
-@@ -37,15 +_,32 @@
+@@ -37,15 +_,34 @@
              if (level.getWorldBorder().isWithinBounds(searchPos)
                  && moveToPossibleSpawnPosition(level, spawnRangeY, searchPos, strategy)
                  && (!checkCollisions || level.noCollision(entityType.getSpawnAABB(searchPos.getX() + 0.5, searchPos.getY(), searchPos.getZ() + 0.5)))) {
 +                // Paper start - PreCreatureSpawnEvent
-+                final com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent event = new com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent(
-+                    org.bukkit.craftbukkit.util.CraftLocation.toBukkit(start, level),
-+                    org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(entityType),
-+                    reason
-+                );
-+                if (!event.callEvent()) {
-+                    if (event.shouldAbortSpawn()) {
-+                        if (onAbort != null) {
-+                            onAbort.run();
++                if (!io.papermc.paper.niceserver.NiceServerConfig.disablePrecatureSpawnEvent && io.papermc.paper.niceserver.NiceServerConfig.shouldCall(com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent.getHandlerList())) {
++                    final com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent event = new com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent(
++                        org.bukkit.craftbukkit.util.CraftLocation.toBukkit(start, level),
++                        org.bukkit.craftbukkit.entity.CraftEntityType.minecraftToBukkit(entityType),
++                        reason
++                    );
++                    if (!event.callEvent()) {
++                        if (event.shouldAbortSpawn()) {
++                            if (onAbort != null) {
++                                onAbort.run();
++                            }
++                            return Optional.empty();
 +                        }
-+                        return Optional.empty();
++                        break;
 +                    }
-+                    break;
 +                }
 +                // Paper end - PreCreatureSpawnEvent
                  T mob = (T)entityType.create(level, null, searchPos, spawnReason, false, false);

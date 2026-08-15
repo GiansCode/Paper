@@ -858,7 +858,7 @@ public class ItemStack implements Cloneable, ConfigurationSerializable, Translat
                 }
 
                 final byte[] itemBytes = new byte[length];
-                input.read(itemBytes);
+                input.readFully(itemBytes);
                 items[i] = ItemStack.deserializeBytes(itemBytes);
             }
             return items;
