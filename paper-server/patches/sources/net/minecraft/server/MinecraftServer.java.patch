@@ -599,12 +599,14 @@
          }
  
          LOGGER.info("Saving worlds");
-@@ -694,6 +_,20 @@
+@@ -694,6 +_,22 @@
          } catch (IOException e) {
              LOGGER.error("Failed to unlock level {}", this.storageSource.getLevelId(), e);
          }
 +        // Spigot start
 +        io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR.shutdown(); // Paper
++        io.papermc.paper.niceserver.AsyncPathProcessor.shutdown(); // NiceServer
++        io.papermc.paper.niceserver.AsyncMobSpawnProcessor.shutdown(); // NiceServer
 +        try {
 +            io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS); // Paper
 +        } catch (InterruptedException _) {} // Paper

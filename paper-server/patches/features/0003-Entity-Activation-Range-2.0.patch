@@ -18,7 +18,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..829f7685904fd741e00403647ae76d32275c34a3
 --- /dev/null
 +++ b/io/papermc/paper/entity/activation/ActivationRange.java
-@@ -0,0 +1,335 @@
+@@ -0,0 +1,354 @@
 +package io.papermc.paper.entity.activation;
 +
 +import net.minecraft.core.BlockPos;
@@ -187,6 +187,24 @@ index 0000000000000000000000000000000000000000..829f7685904fd741e00403647ae76d32
 +                }
 +
 +                ActivationRange.activateEntity(entity);
++                // NiceServer start - DAB
++                if (io.papermc.paper.niceserver.NiceServerConfig.dynamicActivationOfBrain
++                    && (!(entity instanceof net.minecraft.world.entity.Mob) || ((net.minecraft.world.entity.Mob) entity).aware)
++                    && (!io.papermc.paper.niceserver.NiceServerConfig.dabDontEnableIfInWater || entity.is(net.minecraft.tags.EntityTypeTags.CAN_BREATHE_UNDER_WATER) || !entity.isInWater())) {
++                    final int distSq = (int) player.distanceToSqr(entity);
++                    final int prio = distSq > io.papermc.paper.niceserver.NiceServerConfig.dabStartDistanceSquared
++                        ? Math.max(1, Math.min(io.papermc.paper.niceserver.NiceServerConfig.dabMaximumActivationPrio, distSq >> io.papermc.paper.niceserver.NiceServerConfig.dabActivationDistanceMod))
++                        : 1;
++                    if (!entity.activatedPriorityReset) {
++                        entity.activatedPriorityReset = true;
++                        entity.activatedPriority = prio;
++                    } else {
++                        entity.activatedPriority = Math.min(entity.activatedPriority, prio);
++                    }
++                } else {
++                    entity.activatedPriority = 1;
++                }
++                // NiceServer end - DAB
 +            }
 +        }
 +    }
@@ -310,6 +328,7 @@ index 0000000000000000000000000000000000000000..829f7685904fd741e00403647ae76d32
 +     * @return
 +     */
 +    public static boolean checkIfActive(final Entity entity) {
++        entity.activatedPriorityReset = false; // NiceServer DAB - ready for next activateEntities pass
 +        // Never safe to skip fireworks or item gravity
 +        if (entity instanceof FireworkRocketEntity || (entity instanceof ItemEntity && (entity.tickCount + entity.getId()) % 4 == 0)) { // Needed for item gravity, see ItemEntity tick
 +            return true;
@@ -466,7 +485,7 @@ diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity
 index a5792bc27fdc85ecf388ab44c0b1b3055fc41d21..4a18f74c7513f0ac6a3415163165d9239ee5b567 100644
 --- a/net/minecraft/world/entity/Entity.java
 +++ b/net/minecraft/world/entity/Entity.java
-@@ -383,6 +383,15 @@ public abstract class Entity
+@@ -383,6 +383,17 @@ public abstract class Entity
      private final int despawnTime; // Paper - entity despawn time limit
      public int totalEntityAge; // Paper - age-like counter for all entities
      public final io.papermc.paper.entity.activation.ActivationType activationType = io.papermc.paper.entity.activation.ActivationType.activationTypeFor(this); // Paper - EAR 2/tracking ranges
@@ -475,6 +494,8 @@ index a5792bc27fdc85ecf388ab44c0b1b3055fc41d21..4a18f74c7513f0ac6a3415163165d923
 +    public long activatedTick = Integer.MIN_VALUE;
 +    public boolean isTemporarilyActive;
 +    public long activatedImmunityTick = Integer.MIN_VALUE;
++    public boolean activatedPriorityReset = false; // NiceServer DAB
++    public int activatedPriority = 1; // NiceServer DAB
 +
 +    public void inactiveTick() {
 +    }
@@ -482,7 +503,7 @@ index a5792bc27fdc85ecf388ab44c0b1b3055fc41d21..4a18f74c7513f0ac6a3415163165d923
      // CraftBukkit end
  
      // Paper start
-@@ -549,6 +558,13 @@ public abstract class Entity
+@@ -549,6 +560,13 @@ public abstract class Entity
          this.position = Vec3.ZERO;
          this.blockPosition = BlockPos.ZERO;
          this.chunkPosition = ChunkPos.ZERO;
@@ -496,7 +517,7 @@ index a5792bc27fdc85ecf388ab44c0b1b3055fc41d21..4a18f74c7513f0ac6a3415163165d923
          SynchedEntityData.Builder entityDataBuilder = new SynchedEntityData.Builder(this);
          entityDataBuilder.define(DATA_SHARED_FLAGS_ID, (byte)0);
          entityDataBuilder.define(DATA_AIR_SUPPLY_ID, this.getMaxAirSupply());
-@@ -1141,6 +1157,10 @@ public abstract class Entity
+@@ -1141,6 +1159,10 @@ public abstract class Entity
          } else {
              if (moverType == MoverType.PISTON) {
                  delta = this.limitPistonMovement(delta);
@@ -507,7 +528,7 @@ index a5792bc27fdc85ecf388ab44c0b1b3055fc41d21..4a18f74c7513f0ac6a3415163165d923
                  if (delta.equals(Vec3.ZERO)) {
                      return;
                  }
-@@ -1156,6 +1176,13 @@ public abstract class Entity
+@@ -1156,6 +1178,13 @@ public abstract class Entity
                  this.stuckSpeedMultiplier = Vec3.ZERO;
                  this.setDeltaMovement(Vec3.ZERO);
              }
@@ -711,7 +732,7 @@ index 48bf5f612b91c457dd8e99955429832daeaab9e2..0a02aef2ff159a1d94870bf3cede0ed2
          ProfilerFiller profiler = Profiler.get();
          profiler.push("villagerBrain");
 -        this.getBrain().tick(level, this);
-+        if (!inactive) this.getBrain().tick(level, this); // Paper - EAR 2
++        if (!inactive && !io.papermc.paper.niceserver.NiceServerConfig.shouldThrottleDistantBrain(this)) this.getBrain().tick(level, this); // Paper - EAR 2 // NiceServer DAB
          profiler.pop();
          if (this.assignProfessionWhenSpawned) {
              this.assignProfessionWhenSpawned = false;

@@ -8,10 +8,11 @@
      private static final int CACHE_SIZE = 4;
      private final long[] lastChunkPos = new long[4];
      private final @Nullable ChunkStatus[] lastChunkStatus = new ChunkStatus[4];
-@@ -74,6 +_,13 @@
+@@ -74,6 +_,14 @@
      private final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceOpenHashSet<>();
      @VisibleForDebug
      private NaturalSpawner.@Nullable SpawnState lastSpawnState;
++    private final java.util.concurrent.atomic.AtomicBoolean niceserverSpawnTaskQueued = new java.util.concurrent.atomic.AtomicBoolean(); // NiceServer async mob spawning
 +    // Paper start
 +    public final ca.spottedleaf.concurrentutil.map.concurrent.longs.ConcurrentChainedLong2ReferenceHashTable<net.minecraft.world.level.chunk.LevelChunk> fullChunks = new ca.spottedleaf.concurrentutil.map.concurrent.longs.ConcurrentChainedLong2ReferenceHashTable<>();
 +    public int getFullChunksCount() {

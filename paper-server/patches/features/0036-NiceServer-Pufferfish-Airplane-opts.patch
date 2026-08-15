@@ -1,0 +1,186 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Gianluca Falcomer <gianluca@niceserver>
+Date: Sat, 15 Aug 2026 23:12:00 +0200
+Subject: [PATCH] NiceServer: Pufferfish/Airplane hot-path opts
+
+Ported from Pufferfish (GPL-3.0) / Airplane:
+- suffocation check throttle
+- per-chunk lightning countdown
+- special-date calendar cache
+- enderman teleport single-chunk lookup
+- MoveToBlockGoal skip unloaded chunks
+- AttributeMap computeIfAbsent lambda reuse
+
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -1043,7 +1043,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+         int minZ = chunkPos.getMinBlockZ();
+         ProfilerFiller profiler = Profiler.get();
+         profiler.push("thunder");
+-        if (!this.paperConfig().environment.disableThunder && raining && this.isThundering() && this.spigotConfig.thunderChance > 0 && this.random.nextInt(this.spigotConfig.thunderChance) == 0) { // Spigot // Paper - Option to disable thunder
++        if (!this.paperConfig().environment.disableThunder && raining && this.isThundering() && this.spigotConfig.thunderChance > 0 && (io.papermc.paper.niceserver.NiceServerConfig.optimizeChunkLightning ? chunk.shouldDoLightning(this.random) : this.random.nextInt(this.spigotConfig.thunderChance) == 0)) { // Spigot // Paper - Option to disable thunder // NiceServer - Pufferfish lightning
+             BlockPos pos = this.findLightningTargetAround(this.getBlockRandomPos(minX, 0, minZ, 15));
+             if (this.isRainingAt(pos)) {
+                 DifficultyInstance difficulty = this.getCurrentDifficultyAt(pos);
+diff --git a/net/minecraft/util/SpecialDates.java b/net/minecraft/util/SpecialDates.java
+--- a/net/minecraft/util/SpecialDates.java
++++ b/net/minecraft/util/SpecialDates.java
+@@ -13,8 +13,20 @@ public class SpecialDates {
+     public static final MonthDay CHRISTMAS = MonthDay.of(Month.DECEMBER, 24);
+     public static final MonthDay NEW_YEAR = MonthDay.of(Month.JANUARY, 1);
+ 
++    private static MonthDay niceserverCachedDay;
++    private static long niceserverCachedAtMillis;
++    private static final long NICESERVER_DATE_CACHE_MS = 60L * 60L * 1000L;
++
+     public static MonthDay dayNow() {
+-        return MonthDay.from(ZonedDateTime.now());
++        if (!io.papermc.paper.niceserver.NiceServerConfig.cacheSpecialDates) {
++            return MonthDay.from(ZonedDateTime.now());
++        }
++        final long now = System.currentTimeMillis();
++        if (niceserverCachedDay == null || now - niceserverCachedAtMillis > NICESERVER_DATE_CACHE_MS) {
++            niceserverCachedDay = MonthDay.from(ZonedDateTime.now());
++            niceserverCachedAtMillis = now;
++        }
++        return niceserverCachedDay;
+     }
+ 
+     public static boolean isHalloween() {
+diff --git a/net/minecraft/world/entity/LivingEntity.java b/net/minecraft/world/entity/LivingEntity.java
+--- a/net/minecraft/world/entity/LivingEntity.java
++++ b/net/minecraft/world/entity/LivingEntity.java
+@@ -453,7 +453,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+         profiler.push("livingEntityBaseTick");
+         if (this.isAlive() && this.level() instanceof ServerLevel level) {
+             boolean isPlayer = this instanceof Player;
+-            if (this.isInWall()) {
++            if (this.niceserverShouldCheckForSuffocation() && this.isInWall()) { // NiceServer - Pufferfish optimize suffocation
+                 this.hurtServer(level, this.damageSources().inWall(), 1.0F);
+             } else if (isPlayer && !level.getWorldBorder().isWithinBounds(this.getBoundingBox())) {
+                 double dist = level.getWorldBorder().getDistanceToBorder(this) + level.getWorldBorder().getSafeZone();
+@@ -537,6 +537,18 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+     protected boolean shouldTakeDrowningDamage() {
+         return this.getAirSupply() <= -20;
+     }
++
++    // NiceServer start - Pufferfish optimize suffocation
++    public boolean niceserverCouldPossiblyBeHurt(final float amount) {
++        return !((float) this.invulnerableTime > (float) this.invulnerableDuration / 2.0F && amount <= this.lastHurt);
++    }
++
++    public boolean niceserverShouldCheckForSuffocation() {
++        return !io.papermc.paper.niceserver.NiceServerConfig.optimizeSuffocation
++            || (this.tickCount % 10 == 0 && this.niceserverCouldPossiblyBeHurt(1.0F));
++    }
++    // NiceServer end - Pufferfish optimize suffocation
++
+ 
+     @Override
+     protected float getBlockSpeedFactor() {
+diff --git a/net/minecraft/world/entity/ai/attributes/AttributeMap.java b/net/minecraft/world/entity/ai/attributes/AttributeMap.java
+--- a/net/minecraft/world/entity/ai/attributes/AttributeMap.java
++++ b/net/minecraft/world/entity/ai/attributes/AttributeMap.java
+@@ -18,9 +18,11 @@ public class AttributeMap {
+     private final Set<AttributeInstance> attributesToSync = new ObjectOpenHashSet<>();
+     private final Set<AttributeInstance> attributesToUpdate = new ObjectOpenHashSet<>();
+     private final AttributeSupplier supplier;
++    private final java.util.function.Function<Holder<Attribute>, AttributeInstance> niceserverCreateInstance; // NiceServer - Pufferfish reduce allocations
+ 
+     public AttributeMap(final AttributeSupplier supplier) {
+         this.supplier = supplier;
++        this.niceserverCreateInstance = holder -> this.supplier.createInstance(this::onAttributeModified, holder); // NiceServer - Pufferfish reduce allocations
+     }
+ 
+     private void onAttributeModified(final AttributeInstance attributeInstance) {
+@@ -43,6 +45,6 @@ public class AttributeMap {
+ 
+     public @Nullable AttributeInstance getInstance(final Holder<Attribute> attribute) {
+-        return this.attributes.computeIfAbsent(attribute, key -> this.supplier.createInstance(this::onAttributeModified, (Holder<Attribute>)key));
++        return this.attributes.computeIfAbsent(attribute, this.niceserverCreateInstance); // NiceServer - Pufferfish reduce allocations
+     }
+ 
+     public boolean hasAttribute(final Holder<Attribute> attribute) {
+diff --git a/net/minecraft/world/entity/ai/goal/MoveToBlockGoal.java b/net/minecraft/world/entity/ai/goal/MoveToBlockGoal.java
+--- a/net/minecraft/world/entity/ai/goal/MoveToBlockGoal.java
++++ b/net/minecraft/world/entity/ai/goal/MoveToBlockGoal.java
+@@ -119,7 +119,7 @@ public abstract class MoveToBlockGoal extends Goal {
+                 for (int x = 0; x <= r; x = x > 0 ? -x : 1 - x) {
+                     for (int z = x < r && x > -r ? r : 0; z <= r; z = z > 0 ? -z : 1 - z) {
+                         pos.setWithOffset(mobPos, x, y - 1, z);
+-                        if (this.mob.isWithinHome(pos) && this.isValidTarget(this.mob.level(), pos)) {
++                        if ((!io.papermc.paper.niceserver.NiceServerConfig.skipUnloadedChunksForBlockGoals || this.mob.level().hasChunkAt(pos)) && this.mob.isWithinHome(pos) && this.isValidTarget(this.mob.level(), pos)) { // NiceServer - Pufferfish Paper#6045
+                             this.blockPos = pos;
+                             this.mob.movingTarget = pos == BlockPos.ZERO ? null : pos.immutable(); // Paper
+                             return true;
+diff --git a/net/minecraft/world/entity/boss/wither/WitherBoss.java b/net/minecraft/world/entity/boss/wither/WitherBoss.java
+--- a/net/minecraft/world/entity/boss/wither/WitherBoss.java
++++ b/net/minecraft/world/entity/boss/wither/WitherBoss.java
+@@ -138,6 +138,13 @@ public class WitherBoss extends Monster implements RangedAttackMob {
+         this.bossEvent.setName(this.getDisplayName());
+     }
+ 
++    // NiceServer start - Pufferfish optimize suffocation
++    @Override
++    public boolean niceserverShouldCheckForSuffocation() {
++        return true;
++    }
++    // NiceServer end - Pufferfish optimize suffocation
++
+     @Override
+     public SoundEvent getAmbientSound() {
+         return SoundEvents.WITHER_AMBIENT;
+diff --git a/net/minecraft/world/entity/monster/EnderMan.java b/net/minecraft/world/entity/monster/EnderMan.java
+--- a/net/minecraft/world/entity/monster/EnderMan.java
++++ b/net/minecraft/world/entity/monster/EnderMan.java
+@@ -297,11 +297,17 @@ public class EnderMan extends Monster implements NeutralMob {
+     private boolean teleport(final double x, final double y, final double z) {
+         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, y, z);
+ 
+-        while (pos.getY() > this.level().getMinY() && !this.level().getBlockState(pos).blocksMotion()) {
++        // NiceServer start - Pufferfish reduce chunk loading
++        net.minecraft.world.level.chunk.LevelChunk niceserverChunk = io.papermc.paper.niceserver.NiceServerConfig.skipUnloadedChunksForEndermanTeleport ? this.level().getChunkIfLoaded(pos) : this.level().getChunkAt(pos);
++        if (niceserverChunk == null) {
++            return false;
++        }
++        while (pos.getY() > this.level().getMinY() && !niceserverChunk.getBlockState(pos).blocksMotion()) {
++        // NiceServer end - Pufferfish reduce chunk loading
+             pos.move(Direction.DOWN);
+         }
+ 
+-        BlockState blockState = this.level().getBlockState(pos);
++        BlockState blockState = niceserverChunk.getBlockState(pos); // NiceServer - Pufferfish reduce chunk loading
+         boolean couldStandOn = blockState.blocksMotion();
+         boolean isWet = blockState.getFluidState().is(FluidTags.WATER);
+         if (couldStandOn && !isWet) {
+diff --git a/net/minecraft/world/level/chunk/LevelChunk.java b/net/minecraft/world/level/chunk/LevelChunk.java
+--- a/net/minecraft/world/level/chunk/LevelChunk.java
++++ b/net/minecraft/world/level/chunk/LevelChunk.java
+@@ -130,6 +130,17 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+     private final int maxSection;
+     private final boolean debug;
+     private final BlockState defaultBlockState;
++    // NiceServer start - Pufferfish lightning
++    private int lightningTick;
++
++    public final boolean shouldDoLightning(final net.minecraft.util.RandomSource random) {
++        if (this.lightningTick-- <= 0) {
++            this.lightningTick = random.nextInt(Math.max(1, this.level.spigotConfig.thunderChance)) << 1;
++            return true;
++        }
++        return false;
++    }
++    // NiceServer end - Pufferfish lightning
+ 
+     @Override
+     public final BlockState moonrise$getBlock(final int x, final int y, final int z) {
+@@ -173,6 +184,8 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource, ca.spot
+         this.debug = !empty && this.level.isDebug();
+         this.defaultBlockState = empty ? VOID_AIR_BLOCKSTATE : AIR_BLOCKSTATE;
+         // Paper end - get block chunk optimisation
++
++        this.lightningTick = new java.util.Random().nextInt(100000) << 1; // NiceServer - Pufferfish lightning
+     }
+ 
+     public LevelChunk(final ServerLevel level, final ProtoChunk protoChunk, final LevelChunk.@Nullable PostLoadProcessor postLoad) {

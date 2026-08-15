@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Gianluca Falcomer <gianluca@niceserver>
+Date: Sat, 15 Aug 2026 23:00:00 +0200
+Subject: [PATCH] NiceServer: async mob cap recount
+
+Offload NaturalSpawner.createState to a worker. Spawning stays on the
+main thread using last tick's caps (Pufferfish/Leaf).
+
+diff --git a/net/minecraft/server/level/ServerChunkCache.java b/net/minecraft/server/level/ServerChunkCache.java
+index c3adbe0753f6a4158f25126ed7443f8a958763d9..0000000000000000000000000000000000000000 100644
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -538,21 +538,33 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+         // Paper start - Optional per player mob spawns
+         NaturalSpawner.SpawnState spawnCookie;
+         if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
++            final boolean niceserverAsyncMobs = io.papermc.paper.niceserver.NiceServerConfig.asyncMobSpawning; // NiceServer
+             // re-set mob counts
+             for (ServerPlayer player : this.level.players()) {
+                 // Paper start - per player mob spawning backoff
+                 for (int j = 0; j < ServerPlayer.MOBCATEGORY_TOTAL_ENUMS; j++) {
+-                    player.mobCounts[j] = 0;
++                    if (!niceserverAsyncMobs) { // NiceServer - do not zero counts while async recount owns them
++                        player.mobCounts[j] = 0;
++                    }
+ 
+                     int newBackoff = player.mobBackoffCounts[j] - 1; // TODO make configurable bleed // TODO use nonlinear algorithm?
+                     if (newBackoff < 0) {
+                         newBackoff = 0;
+                     }
+                     player.mobBackoffCounts[j] = newBackoff;
+                 }
+                 // Paper end - per player mob spawning backoff
+             }
+-            spawnCookie = NaturalSpawner.createState(chunkCount, this.level.getAllEntities(), this::getFullChunk, null, true);
++            if (!niceserverAsyncMobs || this.lastSpawnState == null) {
++                if (niceserverAsyncMobs) {
++                    for (ServerPlayer player : this.level.players()) {
++                        Arrays.fill(player.mobCounts, 0);
++                    }
++                }
++                spawnCookie = NaturalSpawner.createState(chunkCount, this.level.getAllEntities(), this::getFullChunk, null, true);
++            } else {
++                spawnCookie = this.lastSpawnState; // NiceServer - previous async recount
++            }
+         } else {
+             spawnCookie = NaturalSpawner.createState(chunkCount, this.level.getAllEntities(), this::getFullChunk, !this.level.paperConfig().entities.spawning.perPlayerMobSpawns ? new LocalMobCapCalculator(this.chunkMap) : null, false);
+         }
+@@ -591,6 +603,22 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+ 
+            for (LevelChunk chunk : spawningChunks) {
+                this.tickSpawningChunk(chunk, timeDiff, spawningCategories, spawnCookie);
+            }
++            // NiceServer start - async mob cap recount for next tick
++            if (io.papermc.paper.niceserver.NiceServerConfig.asyncMobSpawning && this.level.paperConfig().entities.spawning.perPlayerMobSpawns
++                && this.niceserverSpawnTaskQueued.compareAndSet(false, true)) {
++                final int mapped = this.distanceManager.getNaturalSpawnChunkCount();
++                io.papermc.paper.niceserver.AsyncMobSpawnProcessor.submit(() -> {
++                    try {
++                        for (ServerPlayer player : this.level.players()) {
++                            Arrays.fill(player.mobCounts, 0);
++                        }
++                        this.lastSpawnState = NaturalSpawner.createState(mapped, this.level.getAllEntities(), this::getFullChunk, null, true);
++                    } finally {
++                        this.niceserverSpawnTaskQueued.set(false);
++                    }
++                });
++            }
++            // NiceServer end - async mob cap recount
+         } finally {
+             spawningChunks.clear();

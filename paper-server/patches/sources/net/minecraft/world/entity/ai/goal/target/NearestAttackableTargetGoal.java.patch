@@ -1,5 +1,15 @@
 --- a/net/minecraft/world/entity/ai/goal/target/NearestAttackableTargetGoal.java
 +++ b/net/minecraft/world/entity/ai/goal/target/NearestAttackableTargetGoal.java
+@@ -40,7 +_,8 @@
+     ) {
+         super(mob, mustSee, mustReach);
+         this.targetType = targetType;
+-        this.randomInterval = reducedTickDelay(randomInterval);
++        final int niceserverInterval = io.papermc.paper.niceserver.NiceServerConfig.targetGoalInterval; // NiceServer
++        this.randomInterval = reducedTickDelay(niceserverInterval > 0 && randomInterval <= 10 ? niceserverInterval : randomInterval); // NiceServer - Leaf-style target interval
+         this.setFlags(EnumSet.of(Goal.Flag.TARGET));
+         this.targetConditions = TargetingConditions.forCombat().range(this.getFollowDistance()).selector(selector);
+     }
 @@ -77,7 +_,7 @@
  
      @Override

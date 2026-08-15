@@ -214,7 +214,7 @@
                      this.noActionTime = 0;
                  }
              }
-@@ -715,6 +_,15 @@
+@@ -715,6 +_,23 @@
      @Override
      protected final void serverAiStep() {
          this.noActionTime++;
@@ -227,6 +227,14 @@
 +            return;
 +        }
 +        // Paper end - Allow nerfed mobs to jump and float
++        // NiceServer start - DAB: keep current path moving, skip sensing/goals when far
++        if (io.papermc.paper.niceserver.NiceServerConfig.shouldThrottleDistantBrain(this)) {
++            this.getLookControl().tick();
++            this.getMoveControl().tick();
++            this.getJumpControl().tick();
++            return;
++        }
++        // NiceServer end - DAB
          ProfilerFiller profiler = Profiler.get();
          profiler.push("sensing");
          this.sensing.tick();

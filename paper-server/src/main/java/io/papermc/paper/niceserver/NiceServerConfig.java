@@ -48,6 +48,21 @@ public final class NiceServerConfig {
     public static boolean skipMapUpdatesWithoutVanillaRenderer = true;
     public static boolean skipMarkerArmorStandTick = true;
     public static boolean useVirtualThreadsForAsyncScheduler = true;
+    public static boolean asyncPathfinding = true;
+    public static int asyncPathfindingThreads = 0;
+    public static boolean asyncMobSpawning = true;
+    public static boolean dynamicActivationOfBrain = true;
+    public static int dabStartDistanceSquared = 8 * 8;
+    public static int dabActivationDistanceMod = 7;
+    public static int dabMaximumActivationPrio = 20;
+    public static boolean dabDontEnableIfInWater = true;
+    public static int targetGoalInterval = 10;
+    public static boolean skipUnloadedChunksForPhantoms = true;
+    public static boolean optimizeSuffocation = true;
+    public static boolean optimizeChunkLightning = true;
+    public static boolean cacheSpecialDates = true;
+    public static boolean skipUnloadedChunksForEndermanTeleport = true;
+    public static boolean skipUnloadedChunksForBlockGoals = true;
 
     // --- gameplay ---
     public static boolean disableNaturalMobSpawning = false;
@@ -120,6 +135,37 @@ public final class NiceServerConfig {
             "Marker armor stands skip LivingEntity.tick. Paper entities.armor-stands.tick still applies.");
         useVirtualThreadsForAsyncScheduler = getBoolean("optimizations.use-virtual-threads-for-async-scheduler", true,
             "Run Folia/Paper async scheduler tasks on virtual threads. Restart required.");
+        asyncPathfinding = getBoolean("optimizations.async-pathfinding", true,
+            "Run mob A* pathfinding off the main thread. Paths apply 1 tick later. Restart not required to disable.");
+        asyncPathfindingThreads = Math.max(0, getInt("optimizations.async-pathfinding-threads", 0,
+            "Worker threads for async pathfinding. 0 = CPU cores / 4. Restart required to change."));
+        asyncMobSpawning = getBoolean("optimizations.async-mob-spawning", true,
+            "Recount mob caps off-thread. Spawning still happens on the main thread. Needs paper per-player-mob-spawns.");
+        dynamicActivationOfBrain = getBoolean("optimizations.dynamic-activation-of-brain", true,
+            "Throttle distant mob AI (Leaf/Pufferfish DAB). Nearby mobs still tick every tick.");
+        final int dabStartDistance = Math.max(1, getInt("optimizations.dab-start-distance", 8,
+            "Distance in blocks before DAB starts throttling AI."));
+        dabStartDistanceSquared = dabStartDistance * dabStartDistance;
+        dabActivationDistanceMod = Math.max(1, getInt("optimizations.dab-activation-distance-mod", 7,
+            "Bit-shift for DAB tick skip. Higher = more throttling. Leaf default 7."));
+        dabMaximumActivationPrio = Math.max(1, getInt("optimizations.dab-maximum-activation-prio", 20,
+            "Max ticks between AI updates for very distant mobs."));
+        dabDontEnableIfInWater = getBoolean("optimizations.dab-dont-enable-if-in-water", true,
+            "Do not DAB-throttle drowning land mobs.");
+        targetGoalInterval = Math.max(0, getInt("optimizations.target-goal-interval", 10,
+            "Replace cheap vanilla target intervals (<=10) with this many ticks. 0 keeps vanilla."));
+        skipUnloadedChunksForPhantoms = getBoolean("optimizations.skip-unloaded-chunks-for-phantoms", true,
+            "Do not load chunks just to spawn phantoms.");
+        optimizeSuffocation = getBoolean("optimizations.optimize-suffocation", true,
+            "Check isInWall at most every 10 ticks, and skip if invulnerable. Wither is unchanged. Pufferfish.");
+        optimizeChunkLightning = getBoolean("optimizations.optimize-chunk-lightning", true,
+            "Replace per-tick thunder RNG with a per-chunk countdown. Same rate, cheaper. Airplane/Pufferfish.");
+        cacheSpecialDates = getBoolean("optimizations.cache-special-dates", true,
+            "Cache Halloween/Christmas calendar checks for 1 hour. Airplane/Pufferfish.");
+        skipUnloadedChunksForEndermanTeleport = getBoolean("optimizations.skip-unloaded-chunks-for-enderman-teleport", true,
+            "Enderman random teleport does not load chunks. Airplane/Pufferfish.");
+        skipUnloadedChunksForBlockGoals = getBoolean("optimizations.skip-unloaded-chunks-for-block-goals", true,
+            "MoveToBlockGoal skips unloaded chunks (Paper#6045). Pufferfish.");
 
         disableNaturalMobSpawning = getBoolean("gameplay.disable-natural-mob-spawning", false,
             "Disable natural (chunk) mob spawning. Spawners, eggs, and plugins still work.");
@@ -155,6 +201,14 @@ public final class NiceServerConfig {
 
     public static boolean shouldCall(final HandlerList handlers) {
         return !skipEventsWithNoListeners || handlers.hasRegisteredListeners();
+    }
+
+    public static boolean shouldThrottleDistantBrain(final net.minecraft.world.entity.Mob mob) {
+        if (!dynamicActivationOfBrain) {
+            return false;
+        }
+        final int prio = mob.activatedPriority;
+        return prio > 1 && (mob.tickCount % prio) != 0;
     }
 
     public static boolean tryDespawnProjectile(final net.minecraft.world.entity.projectile.Projectile projectile) {

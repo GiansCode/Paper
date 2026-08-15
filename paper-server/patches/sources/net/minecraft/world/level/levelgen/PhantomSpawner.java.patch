@@ -34,7 +34,26 @@
                                              BlockPos spawnPos = playerPos.above(20 + random.nextInt(15))
                                                  .east(-10 + random.nextInt(21))
                                                  .south(-10 + random.nextInt(21));
-@@ -50,11 +_,21 @@
+@@ -46,15 +_,37 @@
+-                                            BlockState blockState = level.getBlockState(spawnPos);
+-                                            FluidState fluidState = level.getFluidState(spawnPos);
+-                                            if (NaturalSpawner.isValidEmptySpawnBlock(level, spawnPos, blockState, fluidState, EntityTypes.PHANTOM)) {
++                                            // NiceServer start - skip unloaded chunks for phantoms
++                                            BlockState blockState;
++                                            FluidState fluidState;
++                                            if (io.papermc.paper.niceserver.NiceServerConfig.skipUnloadedChunksForPhantoms) {
++                                                blockState = level.getBlockStateIfLoaded(spawnPos);
++                                                if (blockState == null) {
++                                                    continue;
++                                                }
++                                                fluidState = blockState.getFluidState();
++                                            } else {
++                                                blockState = level.getBlockState(spawnPos);
++                                                fluidState = level.getFluidState(spawnPos);
++                                            }
++                                            if (NaturalSpawner.isValidEmptySpawnBlock(level, spawnPos, blockState, fluidState, EntityTypes.PHANTOM)) {
++                                            // NiceServer end - skip unloaded chunks for phantoms
+                                                 SpawnGroupData groupData = null;
                                                  int groupSize = 1 + random.nextInt(difficulty.getDifficulty().getId() + 1);
  
                                                  for (int i = 0; i < groupSize; i++) {
